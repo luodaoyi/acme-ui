@@ -5,9 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"runtime"
@@ -139,6 +141,9 @@ func publicURLs(bind string, port int) []string {
 		return []string{fmt.Sprintf("http://%s:%d", hostForURL(bind), port)}
 	}
 	var urls []string
+	for _, ip := range publicIPs() {
+		urls = append(urls, fmt.Sprintf("http://%s:%d", hostForURL(ip), port))
+	}
 	ips := localIPs()
 	for _, ip := range ips {
 		urls = append(urls, fmt.Sprintf("http://%s:%d", hostForURL(ip), port))
@@ -147,6 +152,54 @@ func publicURLs(bind string, port int) []string {
 		urls = append(urls, fmt.Sprintf("http://<server-ip>:%d", port))
 	}
 	return urls
+}
+
+func publicIPs() []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client := &http.Client{Timeout: 2 * time.Second}
+	endpoints := []string{
+		"https://api.ipify.org",
+		"https://ifconfig.me/ip",
+	}
+	seen := make(map[string]bool)
+	var ips []string
+	for _, endpoint := range endpoints {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 128))
+		_ = resp.Body.Close()
+		if readErr != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			continue
+		}
+		ip := strings.TrimSpace(string(body))
+		addr, err := netip.ParseAddr(ip)
+		if err != nil || !isPublicAddr(addr) {
+			continue
+		}
+		normalized := addr.String()
+		if !seen[normalized] {
+			seen[normalized] = true
+			ips = append(ips, normalized)
+		}
+	}
+	return ips
+}
+
+func isPublicAddr(addr netip.Addr) bool {
+	return addr.IsGlobalUnicast() &&
+		!addr.IsPrivate() &&
+		!addr.IsLoopback() &&
+		!addr.IsLinkLocalUnicast() &&
+		!addr.IsLinkLocalMulticast() &&
+		!addr.IsMulticast() &&
+		!addr.IsUnspecified()
 }
 
 func hostForURL(host string) string {
