@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>acme-ui</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <main id="login" class="login-shell" hidden>
+    <section class="login-panel">
+      <h1>acme-ui</h1>
+      <form id="loginForm">
+        <label for="masterKey">MasterKey</label>
+        <input id="masterKey" name="masterKey" type="password" autocomplete="current-password" required autofocus>
+        <button type="submit">进入控制台</button>
+      </form>
+      <p class="muted">MasterKey 只在启动终端里显示，本工具不会持久化登录信息。</p>
+      <p id="loginError" class="error"></p>
+    </section>
+  </main>
+
+  <main id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>acme-ui</strong>
+        <span id="versionText">dev</span>
+      </div>
+      <nav>
+        <button data-tab="status" class="active">环境</button>
+        <button data-tab="issue">申请</button>
+        <button data-tab="install">安装</button>
+        <button data-tab="uninstall">卸载</button>
+        <button data-tab="certs">证书</button>
+        <button data-tab="danger">注销/删除</button>
+        <button data-tab="jobs">任务</button>
+      </nav>
+      <button id="logoutBtn" class="secondary">退出登录</button>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <h1 id="pageTitle">环境</h1>
+        <button id="refreshBtn" class="secondary">刷新</button>
+      </header>
+
+      <section id="tab-status" class="tab active">
+        <div class="panel">
+          <h2>运行环境</h2>
+          <dl id="statusGrid" class="kv"></dl>
+        </div>
+        <div class="panel">
+          <h2>工具检测</h2>
+          <table>
+            <thead><tr><th>工具</th><th>状态</th><th>路径</th></tr></thead>
+            <tbody id="toolsBody"></tbody>
+          </table>
+        </div>
+        <form id="installAcmeForm" class="panel inline-form">
+          <h2>安装 acme.sh</h2>
+          <input name="email" type="email" placeholder="邮箱可选，建议填写 admin@example.com">
+          <button type="submit">安装 acme.sh</button>
+        </form>
+      </section>
+
+      <section id="tab-issue" class="tab">
+        <form id="issueForm" class="panel form-grid">
+          <h2>Cloudflare DNS 申请证书</h2>
+          <label>域名列表<textarea name="domains" rows="4" placeholder="example.com&#10;*.example.com" required></textarea></label>
+          <label>Cloudflare 模式
+            <select name="cfMode">
+              <option value="account">CF_Token + CF_Account_ID</option>
+              <option value="zone">CF_Token + CF_Zone_ID</option>
+              <option value="global">CF_Key + CF_Email</option>
+            </select>
+          </label>
+          <label>CF_Token<input name="cfToken" type="password" autocomplete="off"></label>
+          <label>CF_Account_ID<input name="cfAccountId" autocomplete="off"></label>
+          <label>CF_Zone_ID<input name="cfZoneId" autocomplete="off"></label>
+          <label>CF_Key<input name="cfKey" type="password" autocomplete="off"></label>
+          <label>CF_Email<input name="cfEmail" type="email" autocomplete="off"></label>
+          <label>CA
+            <select name="ca">
+              <option value="">acme.sh 默认</option>
+              <option value="letsencrypt">Let's Encrypt</option>
+              <option value="zerossl">ZeroSSL</option>
+              <option value="buypass">Buypass</option>
+              <option value="google">Google Trust Services</option>
+            </select>
+          </label>
+          <label>Key Length
+            <select name="keyLength">
+              <option value="ec-256">ec-256</option>
+              <option value="ec-384">ec-384</option>
+              <option value="2048">2048</option>
+              <option value="3072">3072</option>
+              <option value="4096">4096</option>
+            </select>
+          </label>
+          <label>DNS Sleep<input name="dnsSleep" type="number" min="0" max="3600" placeholder="0"></label>
+          <div class="checks">
+            <label><input name="force" type="checkbox"> force</label>
+            <label><input name="staging" type="checkbox"> staging</label>
+            <label><input name="debug" type="checkbox"> debug</label>
+          </div>
+          <button type="submit">申请证书</button>
+        </form>
+      </section>
+
+      <section id="tab-install" class="tab">
+        <form id="installForm" class="panel form-grid">
+          <h2>安装证书</h2>
+          <label>主域名<input name="domain" placeholder="example.com" required></label>
+          <label>证书类型
+            <select name="ecc">
+              <option value="true">ECC</option>
+              <option value="false">RSA</option>
+            </select>
+          </label>
+          <label>服务
+            <select name="server">
+              <option value="nginx">nginx</option>
+              <option value="haproxy">HAProxy</option>
+            </select>
+          </label>
+          <label>nginx key-file<input name="keyFile" placeholder="/etc/nginx/ssl/example.com/key.pem"></label>
+          <label>nginx fullchain-file<input name="fullchainFile" placeholder="/etc/nginx/ssl/example.com/fullchain.pem"></label>
+          <label>HAProxy 工作目录<input name="workDir" placeholder="/etc/acme-ui"></label>
+          <label>HAProxy PEM 文件<input name="pemFile" placeholder="/etc/haproxy/certs/example.com.pem"></label>
+          <div class="checks">
+            <label><input name="reloadService" type="checkbox" checked> 安装后 reload 服务</label>
+          </div>
+          <button type="submit">安装证书</button>
+        </form>
+      </section>
+
+      <section id="tab-uninstall" class="tab">
+        <form id="uninstallForm" class="panel form-grid">
+          <h2>卸载安装文件</h2>
+          <label>证书文件路径<textarea name="paths" rows="5" placeholder="/etc/nginx/ssl/example.com/fullchain.pem&#10;/etc/nginx/ssl/example.com/key.pem&#10;/etc/haproxy/certs/example.com.pem" required></textarea></label>
+          <label>reload 服务
+            <select name="service">
+              <option value="">不 reload</option>
+              <option value="nginx">nginx</option>
+              <option value="haproxy">HAProxy</option>
+            </select>
+          </label>
+          <div class="checks">
+            <label><input name="reloadService" type="checkbox"> 删除后 reload 服务</label>
+          </div>
+          <label>确认文本<input name="confirm" placeholder="输入 DELETE 确认删除文件" required></label>
+          <button type="submit">卸载文件</button>
+        </form>
+      </section>
+
+      <section id="tab-certs" class="tab">
+        <div class="panel">
+          <h2>证书列表</h2>
+          <button id="loadCertsBtn" class="secondary">加载列表</button>
+          <pre id="certsOutput"></pre>
+        </div>
+        <form id="infoForm" class="panel inline-form">
+          <h2>证书详情</h2>
+          <input name="domain" placeholder="example.com" required>
+          <label><input name="ecc" type="checkbox" checked> ECC</label>
+          <button type="submit">查看</button>
+        </form>
+        <pre id="infoOutput"></pre>
+      </section>
+
+      <section id="tab-danger" class="tab">
+        <form id="dangerForm" class="panel form-grid">
+          <h2>注销或移除</h2>
+          <label>域名<input name="domain" placeholder="example.com" required></label>
+          <label>证书类型
+            <select name="ecc">
+              <option value="true">ECC</option>
+              <option value="false">RSA</option>
+            </select>
+          </label>
+          <label>动作
+            <select name="action">
+              <option value="renew">强制续签</option>
+              <option value="revoke">向 CA 注销证书</option>
+              <option value="remove">从 acme.sh 续签列表移除</option>
+            </select>
+          </label>
+          <label>确认文本<input name="confirm" placeholder="输入域名确认危险操作"></label>
+          <button type="submit">执行</button>
+        </form>
+      </section>
+
+      <section id="tab-jobs" class="tab">
+        <div class="panel">
+          <h2>任务日志</h2>
+          <div id="jobsList" class="jobs-list"></div>
+          <pre id="jobLog"></pre>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
