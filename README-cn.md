@@ -6,6 +6,8 @@
 
 `acme-ui` 不是 `acme.sh` 的替代品。账户数据、DNS API 凭据、续签配置、已签发证书和安装 hook 仍然由 `acme.sh` 管理。
 
+作者：[luodaoyi](https://github.com/luodaoyi)
+
 ## 安装和运行
 
 在 Linux 服务器上启动 `acme-ui`：
