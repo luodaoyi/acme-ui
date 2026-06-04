@@ -1,99 +1,135 @@
 # acme-ui
 
-`acme-ui` 是一个 Linux-only 的临时 Web 控制台，用来远程辅助配置 `acme.sh`、Cloudflare DNS 验证、nginx / HAProxy 证书安装和常见证书操作。
+[中文说明](README-cn.md)
 
-它不是 acme.sh 的替代品。证书账户、DNS 凭据、续签配置和安装记录仍由 acme.sh 管理。
+`acme-ui` is a temporary Linux Web console for operating `acme.sh` on remote servers. It helps configure Cloudflare DNS validation, issue certificates, install certificates for nginx or HAProxy, and run common certificate maintenance actions from a compact browser UI.
 
-## 使用方式
+`acme-ui` does not replace `acme.sh`. Account data, DNS API credentials, renewal configuration, issued certificates, and install hooks remain managed by `acme.sh`.
 
-发布后可以这样启动：
+## Install And Run
 
-```bash
-curl -fsSL https://github.com/<owner>/acme-ui/releases/latest/download/acme-ui.sh | bash
-```
-
-开发或未替换仓库名时：
+Start `acme-ui` on a Linux server:
 
 ```bash
-ACME_UI_REPO=<owner>/acme-ui curl -fsSL https://raw.githubusercontent.com/<owner>/acme-ui/main/scripts/acme-ui.sh | bash
+curl -fsSL https://github.com/luodaoyi/acme-ui/releases/latest/download/acme-ui.sh | bash
 ```
 
-启动后终端会显示随机端口和 `MasterKey`：
+If certificate files must be written under `/etc/nginx`, `/etc/haproxy`, or another root-owned path, run it with root privileges:
+
+```bash
+curl -fsSL https://github.com/luodaoyi/acme-ui/releases/latest/download/acme-ui.sh | sudo bash
+```
+
+The launcher downloads the Linux binary into a temporary directory, runs it in the foreground, and removes the downloaded binary when the process exits.
+
+On startup, the terminal prints the listening address and a one-time `MasterKey`:
 
 ```text
+acme-ui is running
+
 Listen:    0.0.0.0:43127
 Open:      http://<server-ip>:43127
 MasterKey: ...
 Mode:      foreground, press Ctrl+C to exit
 ```
 
-## 特性
+Open the printed URL in a browser and enter the `MasterKey`.
 
-- 前台运行，不安装后台服务。
-- 默认绑定 `0.0.0.0`，端口随机。
-- 每次启动生成一次性 `MasterKey`。
-- 登录 session 只存在内存中。
-- 环境页可用官方 `https://get.acme.sh` 脚本安装 acme.sh，邮箱可选。
-- Cloudflare DNS API 参数只注入当前 acme.sh 子进程。
-- acme.sh 成功申请后，由 acme.sh 自己把续签所需配置保存到 `~/.acme.sh/account.conf`。
-- 支持申请、安装、续签、注销、移除续签记录。
-- 支持显式卸载安装文件，非递归删除，不删除目录。
-- 支持 nginx 证书安装。
-- 支持 HAProxy combined PEM 生成。
-- 任务日志实时输出，敏感信息脱敏。
+## Features
 
-## 持久化边界
+- Foreground-only process; no daemon or background service is installed.
+- Binds to `0.0.0.0` with a random port by default.
+- Generates a per-run `MasterKey` for Web login.
+- Keeps Web sessions in memory only.
+- Installs `acme.sh` from the official `https://get.acme.sh` script when requested.
+- Requires confirmation before running the `acme.sh` installer.
+- Passes Cloudflare DNS API values only to the current `acme.sh` child process.
+- Lets `acme.sh` persist DNS credentials in its own config for future renewals.
+- Supports certificate issue, install, renew, revoke, and remove actions.
+- Supports explicit uninstall of installed certificate files without recursive deletion.
+- Supports nginx certificate install.
+- Supports HAProxy combined PEM generation.
+- Streams task logs in the browser and redacts sensitive values.
 
-工具自身退出后不保留配置。通过 `curl | bash` 启动时，下载的二进制会放到临时目录，进程退出后删除。
+## acme.sh Installation
 
-以下文件属于 acme.sh 或用户选择的业务结果，会保留：
+If `acme.sh` is not found, the environment page shows an install action. The action downloads and runs the official installer:
+
+```bash
+curl -fsSL https://get.acme.sh -o <tmp>/get.acme.sh
+sh <tmp>/get.acme.sh
+```
+
+An email address can be provided in the UI. If provided, it is passed as:
+
+```bash
+sh <tmp>/get.acme.sh email=admin@example.com
+```
+
+The installer is an intentional `acme.sh` operation. It may create `~/.acme.sh`, shell aliases, and a daily cron job according to the official installer behavior.
+
+## Certificate Flow
+
+For Cloudflare DNS validation, enter the required Cloudflare values in the Web UI. `acme-ui` injects them into the `acme.sh` process environment for the selected command.
+
+After a successful DNS issue operation, `acme.sh` stores reusable DNS credentials in its own configuration, such as:
+
+```text
+~/.acme.sh/account.conf
+```
+
+This allows future `acme.sh --cron` renewals to work without `acme-ui` running.
+
+## Persistence Boundary
+
+`acme-ui` itself is temporary. The launcher removes the downloaded binary after exit, and the Web session state is memory-only.
+
+The following artifacts are intentionally persistent because they belong to `acme.sh` or the selected certificate installation:
 
 - `~/.acme.sh/account.conf`
 - `~/.acme.sh/<domain>/`
-- 官方 acme.sh 安装脚本创建的 alias 和 daily cron job
-- acme.sh 保存的 domain 配置和 `reloadcmd`
-- nginx / HAProxy 的证书目标路径
-- 用户显式安装的 acme.sh cron 任务
+- Shell alias and daily cron job created by the official `acme.sh` installer
+- Domain renewal configuration and `reloadcmd` saved by `acme.sh`
+- nginx or HAProxy certificate target files
 
-## 权限
+## Security Model
 
-工具不会在 Web 页面里要求 sudo 密码。它以当前启动用户的权限运行。
+- The Web UI requires the generated `MasterKey`.
+- State-changing API calls require an authenticated session and CSRF token.
+- `acme.sh` actions are mapped to fixed commands; arbitrary shell input is not exposed.
+- nginx and HAProxy reload commands are generated from controlled options.
+- Certificate file uninstall removes only explicit absolute file paths and refuses directories.
+- Secret values are redacted from task logs.
 
-如果要写 `/etc/nginx`、`/etc/haproxy` 或执行 `systemctl reload`，通常需要用 root 启动：
-
-```bash
-curl -fsSL https://github.com/<owner>/acme-ui/releases/latest/download/acme-ui.sh | sudo bash
-```
-
-## 本地构建
+## Build From Source
 
 ```bash
 go test ./...
 go build ./cmd/acme-ui
 ```
 
-Linux 运行：
+Run on Linux:
 
 ```bash
 ./acme-ui
 ```
 
-开发机非 Linux 临时调试：
+For local development on a non-Linux machine:
 
 ```bash
 ACME_UI_ALLOW_NON_LINUX=1 go run ./cmd/acme-ui
 ```
 
-## 发布
+## Release
 
-推送 tag 会触发 GitHub Actions：
+Pushing a `v*` tag triggers the GitHub Actions release workflow:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-发布产物：
+Release assets:
 
 - `acme-ui-linux-amd64`
 - `acme-ui-linux-arm64`

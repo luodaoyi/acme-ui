@@ -44,7 +44,7 @@ jobs:
               -ldflags "-s -w -X main.version=${version} -X main.commit=${GITHUB_SHA}" \
               -o "dist/acme-ui-linux-${arch}" ./cmd/acme-ui
           done
-          sed "s#__GITHUB_REPOSITORY__#${GITHUB_REPOSITORY}#g" scripts/acme-ui.sh > dist/acme-ui.sh
+          cp scripts/acme-ui.sh dist/acme-ui.sh
           chmod +x dist/acme-ui.sh dist/acme-ui-linux-*
           (
             cd dist

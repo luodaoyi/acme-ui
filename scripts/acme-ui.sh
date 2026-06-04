@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="${ACME_UI_REPO:-__GITHUB_REPOSITORY__}"
-if [[ "$repo" == "__GITHUB_REPOSITORY__" || -z "$repo" ]]; then
-  echo "ACME_UI_REPO is not configured. Example: ACME_UI_REPO=owner/acme-ui curl -fsSL ... | bash" >&2
-  exit 1
-fi
+repo="luodaoyi/acme-ui"
 
 arch="$(uname -m)"
 case "$arch" in
